@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>バナーチャレンジ！ | DADA WORKS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  /* ── ライトモード（サイトに合わせた白ベース） ── */
+  :root {
+    --bg: #ffffff;
+    --bg2: #f7f7f5;
+    --surface: #ebebeb;
+    --accent: #1a1a5e;   /* DADA WORKSのネイビー（濃い） */
+    --accent-pop: #2e2e8a; /* ゲーム用ネイビー */
+    --accent2: #e8c84a;  /* ゴールドイエロー・アクセント */
+    --accent3: #2e6a8a;  /* スチールブルー */
+    --text: #1a1a1a;
+    --muted: #888;
+    --border: #e0e0e0;
+  }
+  /* ── ダークモード ── */
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg: #12121e;
+      --bg2: #1a1a2e;
+      --surface: #22223a;
+      --accent: #7070cc;
+      --accent-pop: #8888dd;
+      --accent2: #e8c84a;
+      --accent3: #4a8fa8;
+      --text: #f0f0f0;
+      --muted: #9090a8;
+      --border: #2e2e4a;
+    }
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'Noto Sans JP',sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;overflow:hidden;
+  }
+
+  #game-wrapper{position:relative;width:800px;max-width:100vw;}
+
+  /* ヘッダー */
+  #header{display:flex;align-items:center;justify-content:space-between;padding:0 2px 10px;}
+  .logo{
+    font-family:'Space Mono',monospace;font-size:12px;font-weight:700;
+    color:var(--accent);letter-spacing:.18em;
+  }
+  #progress-bar-wrap{flex:1;margin:0 16px;height:4px;background:var(--surface);border-radius:2px;overflow:hidden;}
+  #progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .2s;width:0%;}
+  #progress-label{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;}
+
+  /* キャンバス */
+  #gameCanvas{display:block;border:1.5px solid var(--border);border-radius:6px;}
+
+  /* バナープレビュー */
+  #banner-preview{position:absolute;top:8px;right:8px;z-index:10;}
+  #banner-preview-label{font-size:7px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:.1em;margin-bottom:2px;text-align:right;}
+  #bannerCanvas{display:block;border:1.5px solid var(--accent);border-radius:3px;}
+
+  /* ── START SCREEN ── */
+  #startScreen{
+    position:absolute;top:0;left:0;right:0;bottom:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:6px;z-index:20;padding:24px;
+    background:#12121e;
+    color:#f0f0f0;
+  }
+  #startScreen h1{font-size:32px;font-weight:900;margin-bottom:10px;line-height:1.2;text-align:center;letter-spacing:.02em;}
+  #startScreen .sub{font-size:13px;margin-bottom:28px;text-align:center;line-height:1.9;color:#aaa;}
+
+  /* ── GOAL WARNING: コミック吹き出し ── */
+  #goal-warning{
+    position:absolute;top:0;left:0;right:0;bottom:0;
+    background:rgba(18,18,30,.7);
+    display:none;flex-direction:column;
+    align-items:center;justify-content:center;
+    z-index:15;pointer-events:none;
+    border-radius:6px;
+    animation:goalFadeIn .15s ease;
+  }
+  #goal-bubble{
+    background:#fff;
+    border:4px solid #1a1a1a;
+    border-radius:20px;
+    padding:24px 40px;
+    position:relative;
+    text-align:center;
+    box-shadow:5px 6px 0 #1a1a1a;
+    animation:goalPop .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  #goal-bubble::after{content:'';position:absolute;bottom:-28px;left:56px;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:28px solid #1a1a1a;}
+  #goal-bubble::before{content:'';position:absolute;bottom:-20px;left:60px;width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:22px solid #fff;z-index:1;}
+  #goal-warning-text{font-size:34px;font-weight:900;line-height:1.3;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;}
+  #goal-warning-sub{font-size:11px;margin-top:8px;color:#888;font-family:'Space Mono',monospace;letter-spacing:.12em;}
+  @keyframes goalFadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes goalPop{from{transform:scale(.6);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+  /* ── RESULT MODAL ── */
+  #resultModal{
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,.5);
+    display:none;align-items:center;justify-content:center;
+    z-index:100;
+    animation:modalFadeIn .2s ease;
+  }
+  #resultCard{
+    background:#fff;
+    color:#1a1a1a;
+    border-radius:16px;
+    padding:28px 32px 24px;
+    width:400px;max-width:92vw;
+    box-shadow:0 20px 60px rgba(0,0,0,.2);
+    display:flex;flex-direction:column;align-items:center;
+    animation:cardUp .28s cubic-bezier(.34,1.56,.64,1);
+  }
+  @media(prefers-color-scheme:dark){
+    #resultCard{background:#1a1a2e;color:#f0f0f0;}
+  }
+  @keyframes modalFadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes cardUp{from{transform:translateY(32px) scale(.97);opacity:0;}to{transform:translateY(0) scale(1);opacity:1;}}
+
+  #result-brand-bar{
+    font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.22em;
+    color:var(--accent);margin-bottom:14px;
+    display:flex;align-items:center;gap:8px;width:100%;
+  }
+  #result-brand-bar::before,#result-brand-bar::after{content:'';flex:1;height:1px;background:var(--accent);opacity:.3;}
+  #result-char{font-size:48px;line-height:1;margin-bottom:4px;}
+  #result-rank-label{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:.18em;margin-bottom:2px;text-transform:uppercase;}
+  #result-title{font-size:24px;font-weight:900;margin-bottom:4px;text-align:center;letter-spacing:.02em;}
+  #result-desc{font-size:12px;color:var(--muted);margin-bottom:6px;text-align:center;line-height:1.7;max-width:280px;}
+  #result-stats{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent3);margin-bottom:10px;text-align:center;}
+  #result-banner-wrap{border:1.5px solid var(--accent);border-radius:6px;overflow:hidden;margin-bottom:12px;}
+  .result-divider{width:100%;border:none;border-top:1px solid var(--border);margin:8px 0 12px;}
+  #result-cta-copy{font-size:13px;font-weight:700;text-align:center;margin-bottom:4px;line-height:1.5;}
+  #result-cta-sub{font-size:11px;color:var(--muted);text-align:center;margin-bottom:14px;line-height:1.7;max-width:280px;}
+  .result-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+
+  /* ── ボタン ── */
+  .btn{
+    background:var(--accent);color:#fff;border:none;
+    padding:10px 28px;font-size:14px;font-weight:700;
+    font-family:'Noto Sans JP',sans-serif;
+    border-radius:4px;cursor:pointer;
+    transition:opacity .15s,transform .1s;letter-spacing:.04em;
+  }
+  .btn:hover{opacity:.85;transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn-ghost{
+    background:transparent;color:var(--accent);
+    border:1.5px solid var(--accent);
+    padding:10px 28px;font-size:14px;font-weight:700;
+    font-family:'Noto Sans JP',sans-serif;
+    border-radius:4px;cursor:pointer;
+    transition:background .15s,color .15s;letter-spacing:.04em;
+  }
+  .btn-ghost:hover{background:var(--accent);color:#fff;}
+
+  #hint{margin-top:8px;font-size:10px;color:var(--muted);text-align:center;font-family:'Space Mono',monospace;}
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+  <div id="header">
+    <span class="logo">DADA WORKS</span>
+    <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+    <span id="progress-label">GOAL ▶</span>
+  </div>
+  <div style="position:relative">
+    <canvas id="gameCanvas" width="800" height="260"></canvas>
+    <div id="banner-preview">
+      <div id="banner-preview-label">BANNER PROGRESS</div>
+      <canvas id="bannerCanvas" width="110" height="46"></canvas>
+    </div>
+    <div id="goal-warning">
+      <div id="goal-bubble">
+        <div id="goal-warning-text">やっぱり最初のが<br>良かったかな</div>
+        <div id="goal-warning-sub">— CLIENT —</div>
+      </div>
+    </div>
+    <!-- START -->
+    <div id="startScreen">
+      <div style="font-size:13px;font-family:'Space Mono',monospace;letter-spacing:.2em;color:#7070cc;margin-bottom:12px;">DADA WORKS</div>
+      <h1>バナー<span style="color:#7070cc">チャレンジ！</span></h1>
+      <p class="sub">クライアントの無茶ぶりを避けながら走れ！<br>良い素材を集めてバナーを完成させよう。</p>
+      <button class="btn" onclick="startGame()" style="background:#7070cc;font-size:15px;padding:12px 40px;">スタート！</button>
+      <p style="margin-top:14px;font-size:10px;color:#666;font-family:'Space Mono',monospace;">SPACE / TAP → jump &nbsp;|&nbsp; ↓ → duck</p>
+    </div>
+  </div>
+  <div id="hint">SPACE / TAP → jump &nbsp;|&nbsp; ↓ → duck</div>
+</div>
+
+<!-- RESULT MODAL -->
+<div id="resultModal" style="display:none">
+  <div id="resultCard">
+    <div id="result-brand-bar">DADA WORKS</div>
+    <div id="result-char">🎨</div>
+    <div id="result-rank-label">YOUR RANK</div>
+    <div id="result-title" style="color:#2d2d6b">バナーマスター</div>
+    <div id="result-desc">説明文</div>
+    <div id="result-stats">アイテム 0個 / 完成度 0%</div>
+    <div id="result-banner-wrap"><canvas id="bannerFinalCanvas" width="220" height="88"></canvas></div>
+    <hr class="result-divider">
+    <div id="result-cta-copy">「なんかいい感じ」を汲み取って<br>形にする戦略デザインチームがあります。</div>
+    <div id="result-cta-sub">DADA WORKSの考え方、見てみませんか。</div>
+    <div class="result-buttons">
+      <button class="btn-ghost" onclick="startGame()">もう一度</button>
+      <button class="btn" onclick="window.open('https://dadaworks.co.jp','_blank')">DADA WORKSの考え方 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const isDark=()=>window.matchMedia('(prefers-color-scheme:dark)').matches;
+const C={
+  get bg()     { return isDark()?'#12121e':'#ffffff'; },
+  get bg2()    { return isDark()?'#1a1a2e':'#f7f7f5'; },
+  get ground() { return isDark()?'#1a1a2e':'#f0f0ee'; },
+  get dot()    { return isDark()?'rgba(112,112,204,0.07)':'rgba(45,45,107,0.05)'; },
+  get line()   { return isDark()?'rgba(112,112,204,0.12)':'rgba(45,45,107,0.1)'; },
+  get accent() { return isDark()?'#7070cc':'#2d2d6b'; },
+  get accent2(){ return '#e8c84a'; },
+};
+
+const RANKS=[
+  {min:0, icon:'😰',title:'やり直し確定',   desc:'「全部やり直しで」と言われる前に逃げよう。',     color:'#cc4444'},
+  {min:4, icon:'🐣',title:'バナー見習い',    desc:'修行中。まだペンの持ち方を覚えている段階。',     color:'#888888'},
+  {min:9, icon:'✏️',title:'素材ハンター',    desc:'良い素材を嗅ぎ分ける嗅覚だけは持っている。',    color:'#4a8a4a'},
+  {min:15,icon:'🎨',title:'デザイナー覚醒',  desc:'汲み取る力が開花し始めた。次のステージへ。',     color:'#4a8fa8'},
+  {min:22,icon:'💡',title:'汲み取りの達人',  desc:'クライアントの言葉の裏を読む力がある。',         color:'#b8940a'},
+  {min:30,icon:'🔥',title:'バナーマスター',   desc:'無茶ぶりをも力に変える圧倒的な実力。',          color:'#2d2d6b'},
+  {min:40,icon:'👑',title:'戦略デザインの神',desc:'DADA WORKSと、一緒に仕事がしたい。',            color:'#2d2d6b'},
+];
+function getRank(items,pct){const sc=items+Math.floor(pct/5);let r=RANKS[0];for(const rank of RANKS){if(sc>=rank.min)r=rank;}return r;}
+
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const bannerCanvas=document.getElementById('bannerCanvas');
+const bCtx=bannerCanvas.getContext('2d');
+
+let state='idle',frame=0,speed=4;
+let bannerProgress=0,itemsCollected=0;
+let goalSpawned=false,goalWarningTimer=0;
+let nextObstacle=70,nextItem=20;
+const GOAL_FRAME=1400;
+const player={x:80,y:0,w:32,h:44,vy:0,onGround:true,ducking:false,jumpCount:0};
+const GROUND_Y=canvas.height-60;
+let obstacles=[],items=[],particles=[],floatingTexts=[];
+const bannerElements=[];
+
+const OBSTACLE_TEXTS=[
+  'もっとポップに','ダイナミックな感じで','高級感欲しい','おしゃれなイメージで',
+  'なんかいい感じに','アツいイメージ','もっとエモく','スタイリッシュに',
+  'パッと目を引く感じ','やわらかい雰囲気で','クールな感じ','洗練された感じ',
+  'インパクトが欲しい','もっとフレッシュに','グッとくる感じ','センスよく',
+];
+const ITEM_TYPES=[
+  {label:'良いブリーフ',color:'#4a8fa8',pts:15,icon:'📋'},
+  {label:'素材OK',      color:'#b8940a',pts:10,icon:'🖼️'},
+  {label:'承認！',      color:'#2d2d6b',pts:20,icon:'✅'},
+  {label:'いい感じ！',  color:'#4a8a4a',pts:12,icon:'⭐'},
+];
+
+function resetGame(){
+  frame=0;speed=4;bannerProgress=0;itemsCollected=0;
+  goalSpawned=false;goalWarningTimer=0;
+  nextObstacle=70;nextItem=20;
+  obstacles=[];items=[];particles=[];floatingTexts=[];
+  bannerElements.length=0;
+  player.y=GROUND_Y-player.h;player.vy=0;
+  player.onGround=true;player.ducking=false;player.jumpCount=0;
+  document.getElementById('progress-bar').style.width='0%';
+  document.getElementById('goal-warning').style.display='none';
+}
+function startGame(){
+  resetGame();
+  document.getElementById('startScreen').style.display='none';
+  document.getElementById('resultModal').style.display='none';
+  state='playing';
+  requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();doJump();}
+  if(e.code==='ArrowDown'){e.preventDefault();player.ducking=true;}
+});
+document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')player.ducking=false;});
+canvas.addEventListener('touchstart',e=>{e.preventDefault();doJump();},{passive:false});
+function doJump(){
+  if(state==='playing'&&(player.onGround||player.jumpCount<2)){
+    player.vy=-13;player.onGround=false;player.jumpCount++;
+    addParticles(player.x+player.w/2,player.y+player.h,C.accent,5);
+  }
+}
+function addParticles(x,y,color,n){for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*4,vy:-Math.random()*4-1,alpha:1,color,r:Math.random()*3+1});}
+function addFloatingText(x,y,text,color){floatingTexts.push({x,y,text,color,alpha:1,vy:-1.5});}
+
+function drawBanner(c,w,h,progress,elements){
+  c.clearRect(0,0,w,h);
+  // ネイビーグラデ
+  const grd=c.createLinearGradient(0,0,w,h);
+  grd.addColorStop(0,`hsl(240,45%,${15+progress*.1}%)`);
+  grd.addColorStop(1,`hsl(230,45%,${10+progress*.05}%)`);
+  c.fillStyle=grd;c.fillRect(0,0,w,h);
+  elements.forEach(el=>{
+    c.save();c.globalAlpha=Math.min(el.age/30,.85);
+    if(el.type==='rect'){c.fillStyle=el.color;c.fillRect(el.x*w,el.y*h,el.ww*w,el.hh*h);}
+    else if(el.type==='text'){c.fillStyle=el.color;c.font=`bold ${Math.floor(el.size*h)}px "Noto Sans JP"`;c.textAlign='center';c.fillText(el.text,el.x*w,el.y*h);}
+    else{c.fillStyle=el.color;c.beginPath();c.arc(el.x*w,el.y*h,el.r*Math.min(w,h),0,Math.PI*2);c.fill();}
+    el.age++;c.restore();
+  });
+  if(progress<8){c.fillStyle='rgba(255,255,255,.18)';c.font=`${Math.floor(h*.2)}px "Noto Sans JP"`;c.textAlign='center';c.fillText('制作中...',w/2,h*.62);}
+  c.fillStyle='rgba(0,0,0,.25)';c.fillRect(0,h-3,w,3);
+  c.fillStyle=C.accent2;c.fillRect(0,h-3,w*(progress/100),3);
+}
+function addBannerElement(){
+  const colors=['#7070cc','#e8c84a','#4a8fa8','#a8c87a','#cc88aa','#ffffffcc'];
+  const c=colors[Math.floor(Math.random()*colors.length)];
+  const type=['rect','text','circle'][Math.floor(Math.random()*3)];
+  if(type==='rect') bannerElements.push({type,color:c+'55',x:Math.random()*.65,y:Math.random()*.65,ww:.1+Math.random()*.45,hh:.05+Math.random()*.35,age:0});
+  else if(type==='text'){const txts=['SALE','NEW','¥980','限定','今すぐ','CHECK','✦'];bannerElements.push({type,color:c,x:.15+Math.random()*.7,y:.25+Math.random()*.55,size:.18+Math.random()*.2,text:txts[Math.floor(Math.random()*txts.length)],age:0});}
+  else bannerElements.push({type,color:c+'55',x:Math.random(),y:Math.random(),r:.05+Math.random()*.18,age:0});
+}
+
+function spawnObstacle(textOverride,isGoal){
+  const text=textOverride||OBSTACLE_TEXTS[Math.floor(Math.random()*OBSTACLE_TEXTS.length)];
+  const isLow=!isGoal&&Math.random()<.28;
+  const bh=isLow?44:62+Math.random()*12;
+  const bw=Math.max(100,text.length*15+44);
+  obstacles.push({x:canvas.width+10,y:isLow?GROUND_Y-36:GROUND_Y-bh,w:bw,h:isLow?36:bh,text,isLow,isGoal:!!isGoal,
+    color:isGoal?'#cc3333':isDark()?`hsl(240,50%,55%)`:`hsl(240,50%,40%)`});
+}
+function spawnItem(){
+  const type=ITEM_TYPES[Math.floor(Math.random()*ITEM_TYPES.length)];
+  items.push({x:canvas.width+10,y:GROUND_Y-75-Math.random()*45,w:36,h:36,...type,bob:Math.random()*Math.PI*2});
+}
+
+function drawPlayer(x,y,ducking){
+  const h=ducking?player.h*.6:player.h;
+  const ay=ducking?y+player.h-h:y;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.08)';
+  ctx.beginPath();ctx.ellipse(x+player.w/2,GROUND_Y+player.h+1,12,4,0,0,Math.PI*2);ctx.fill();
+  // body — ネイビー
+  ctx.fillStyle=isDark()?'#5050aa':'#2d2d6b';
+  ctx.beginPath();ctx.roundRect(x+4,ay+14,player.w-8,h-14,6);ctx.fill();
+  // collar
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(x+9,ay+14,player.w-18,8,3);ctx.fill();
+  // head
+  ctx.fillStyle='#f5d5b0';ctx.beginPath();ctx.arc(x+player.w/2,ay+11,12,0,Math.PI*2);ctx.fill();
+  // hair
+  ctx.fillStyle='#2a1a0a';ctx.beginPath();ctx.arc(x+player.w/2,ay+4,10,Math.PI,0);ctx.fill();
+  // glasses
+  ctx.strokeStyle='#333';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(x+player.w/2-11,ay+8,8,6,2);ctx.stroke();
+  ctx.beginPath();ctx.roundRect(x+player.w/2+3,ay+8,8,6,2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+player.w/2-3,ay+11);ctx.lineTo(x+player.w/2+3,ay+11);ctx.stroke();
+  // pen
+  const penSwing=player.onGround?Math.sin(frame*.22)*5:-4;
+  ctx.strokeStyle=C.accent2;ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(x+player.w-2,ay+(ducking?h*.5:20));ctx.lineTo(x+player.w+12,ay+(ducking?h*.55:18+penSwing));ctx.stroke();
+  ctx.fillStyle=C.accent2;ctx.beginPath();ctx.arc(x+player.w+12,ay+(ducking?h*.55:18+penSwing),3,0,Math.PI*2);ctx.fill();
+  // legs
+  ctx.fillStyle='#222';
+  if(!ducking){
+    const ls=Math.sin(frame*.26)*7;
+    ctx.beginPath();ctx.roundRect(x+7,ay+h-14,7,14+ls,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(x+player.w-14,ay+h-14,7,14-ls,3);ctx.fill();
+    ctx.fillStyle=isDark()?'#5050aa':'#2d2d6b';
+    ctx.beginPath();ctx.roundRect(x+5,ay+h-4+Math.max(0,ls),10,5,2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(x+player.w-16,ay+h-4+Math.max(0,-ls),10,5,2);ctx.fill();
+  }
+}
+
+function drawObstacle(obs){
+  const{x:bx,y:by,w:bw,h:bh,text,isGoal}=obs;
+  if(isGoal){ctx.shadowColor='rgba(200,50,50,.6)';ctx.shadowBlur=16;}
+  // white bubble
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath();ctx.roundRect(bx,by,bw,bh-12,10);ctx.fill();
+  // border
+  ctx.strokeStyle=obs.color;ctx.lineWidth=isGoal?3:2;
+  ctx.beginPath();ctx.roundRect(bx,by,bw,bh-12,10);ctx.stroke();
+  // tail
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath();ctx.moveTo(bx+16,by+bh-12);ctx.lineTo(bx+7,by+bh);ctx.lineTo(bx+30,by+bh-12);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=obs.color;ctx.lineWidth=isGoal?3:2;
+  ctx.beginPath();ctx.moveTo(bx+16,by+bh-12);ctx.lineTo(bx+7,by+bh);ctx.lineTo(bx+30,by+bh-12);ctx.stroke();
+  ctx.shadowBlur=0;
+  // text
+  ctx.fillStyle=isGoal?'#cc2222':'#1a1a1a';
+  ctx.font='bold 13px "Noto Sans JP"';
+  ctx.textAlign='center';
+  ctx.fillText(text,bx+bw/2,by+(bh-12)/2+5);
+}
+
+function drawItem(item){
+  const bob=Math.sin(frame*.08+item.bob)*4;
+  const ix=item.x,iy=item.y+bob;
+  // outer glow only
+  ctx.fillStyle=item.color+'33';ctx.beginPath();ctx.arc(ix+18,iy+18,22,0,Math.PI*2);ctx.fill();
+  // solid circle
+  ctx.fillStyle=item.color;ctx.beginPath();ctx.arc(ix+18,iy+18,16,0,Math.PI*2);ctx.fill();
+  // white highlight
+  ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(ix+13,iy+13,5,0,Math.PI*2);ctx.fill();
+  ctx.font='17px serif';ctx.textAlign='center';ctx.fillText(item.icon,ix+18,iy+24);
+}
+
+function drawGround(){
+  ctx.fillStyle=C.ground;
+  ctx.fillRect(0,GROUND_Y+player.h,canvas.width,canvas.height-GROUND_Y-player.h);
+  ctx.strokeStyle=C.accent;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,GROUND_Y+player.h);ctx.lineTo(canvas.width,GROUND_Y+player.h);ctx.stroke();
+  ctx.strokeStyle=C.line;ctx.lineWidth=1;ctx.setLineDash([20,20]);
+  const dashOff=-(frame*speed*.4)%40;
+  ctx.beginPath();ctx.moveTo(dashOff,GROUND_Y+player.h+8);ctx.lineTo(canvas.width+40,GROUND_Y+player.h+8);ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawBG(){
+  ctx.fillStyle=C.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
+  // subtle grid dots
+  ctx.fillStyle=C.dot;
+  for(let i=0;i<50;i++){
+    const sx=((i*157-frame*.3)%canvas.width+canvas.width)%canvas.width;
+    const sy=8+(i*83)%(GROUND_Y-8);
+    ctx.beginPath();ctx.arc(sx,sy,1,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function rectsOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+function getPlayerRect(){
+  const h=player.ducking?player.h*.6:player.h;
+  const y=player.ducking?player.y+player.h-h:player.y;
+  return{x:player.x+7,y:y+5,w:player.w-14,h:h-8};
+}
+
+function loop(){
+  if(state!=='playing')return;
+  frame++;speed=4+frame/600;
+  const pct=Math.min(100,(frame/GOAL_FRAME)*100);
+  document.getElementById('progress-bar').style.width=pct+'%';
+  const secsLeft=Math.ceil(Math.max(0,GOAL_FRAME-frame)/60);
+  document.getElementById('progress-label').textContent=frame>=GOAL_FRAME?'GOAL！':`GOAL ▶ ${secsLeft}s`;
+
+  player.vy+=.68;player.y+=player.vy;
+  const gY=GROUND_Y-(player.ducking?player.h*.6:player.h);
+  if(player.y>=gY){player.y=gY;player.vy=0;player.onGround=true;player.jumpCount=0;}
+
+  if(frame>=nextObstacle){spawnObstacle();nextObstacle=frame+72+Math.floor(Math.random()*55);}
+  if(frame>=nextItem){spawnItem();nextItem=frame+44+Math.floor(Math.random()*55);}
+
+  if(!goalSpawned&&frame>=GOAL_FRAME){
+    goalSpawned=true;goalWarningTimer=100;
+    obstacles=obstacles.filter(o=>o.x>canvas.width+50);
+    spawnObstacle('やっぱり最初のが良かったかな',true);
+    document.getElementById('goal-warning').style.display='flex';
+  }
+  if(goalWarningTimer>0){goalWarningTimer--;if(goalWarningTimer<=0)document.getElementById('goal-warning').style.display='none';}
+
+  const pr=getPlayerRect();
+  for(let i=obstacles.length-1;i>=0;i--){
+    obstacles[i].x-=speed;
+    if(rectsOverlap(pr,obstacles[i])){gameOver();return;}
+    if(obstacles[i].x+obstacles[i].w<0)obstacles.splice(i,1);
+  }
+  for(let i=items.length-1;i>=0;i--){
+    items[i].x-=speed;
+    if(rectsOverlap(pr,{x:items[i].x,y:items[i].y,w:items[i].w,h:items[i].h})){
+      const it=items[i];itemsCollected++;
+      bannerProgress=Math.min(100,bannerProgress+7);
+      addBannerElement();
+      addParticles(it.x+18,it.y+18,it.color,14);
+      addFloatingText(it.x,it.y-8,`+${it.pts}pt`,it.color);
+      items.splice(i,1);
+    }else if(items[i].x+items[i].w<0)items.splice(i,1);
+  }
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.alpha-=.035;if(p.alpha<=0)particles.splice(i,1);}
+  for(let i=floatingTexts.length-1;i>=0;i--){const ft=floatingTexts[i];ft.y+=ft.vy;ft.alpha-=.022;if(ft.alpha<=0)floatingTexts.splice(i,1);}
+
+  drawBG();drawGround();
+  obstacles.forEach(drawObstacle);
+  items.forEach(drawItem);
+  particles.forEach(p=>{ctx.globalAlpha=p.alpha;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();});
+  ctx.globalAlpha=1;
+  floatingTexts.forEach(ft=>{ctx.globalAlpha=ft.alpha;ctx.fillStyle=ft.color;ctx.font='bold 12px "Space Mono"';ctx.textAlign='center';ctx.fillText(ft.text,ft.x,ft.y);});
+  ctx.globalAlpha=1;
+  drawPlayer(player.x,player.y,player.ducking);
+  drawBanner(bCtx,110,46,bannerProgress,bannerElements);
+  requestAnimationFrame(loop);
+}
+
+function gameOver(){
+  state='dead';
+  document.getElementById('goal-warning').style.display='none';
+  const rank=getRank(itemsCollected,bannerProgress);
+  document.getElementById('result-char').textContent=rank.icon;
+  document.getElementById('result-title').textContent=rank.title;
+  document.getElementById('result-title').style.color=rank.color;
+  document.getElementById('result-desc').textContent=rank.desc;
+  document.getElementById('result-stats').textContent=`集めたアイテム: ${itemsCollected}個　/　バナー完成度: ${Math.round(bannerProgress)}%`;
+  const fc=document.getElementById('bannerFinalCanvas');
+  drawBanner(fc.getContext('2d'),220,88,bannerProgress,bannerElements);
+  document.getElementById('resultModal').style.display='flex';
+}
+
+drawBG();drawGround();drawPlayer(player.x,GROUND_Y-player.h,false);
+drawBanner(bCtx,110,46,0,[]);
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{
+  if(state==='idle'){drawBG();drawGround();drawPlayer(player.x,GROUND_Y-player.h,false);}
+});
+</script>
+</body>
+</html>
